@@ -1,0 +1,200 @@
+#!/usr/bin/env node
+
+/**
+ * Module dependencies.
+ */
+
+var app = require('../app');
+var debug = require('debug')('Minesweep:server');
+var server = require('http').createServer(app);
+
+/**
+ * Get port from environment and store in Express.
+ */
+// old ports: 9012
+// 8239 = global
+var port = normalizePort(process.env.PORT || '8239');
+app.set('port', port);
+
+var io = require('socket.io')().attach(server); 
+
+/**
+ * Listen on provided port, on all network interfaces.
+ */
+
+var clients = [];
+var color_names = [ 'Red', 'Orange', 'Yellow', 'Green', 'Blue', 'Teal', 'Magenta', 'Brown' ];
+
+io.sockets.on('connection', function(socket) {
+  console.log("\n\n---Connection---");
+  if(clients.length == 8)
+    return;
+  socket.on("client_info", function(data) {
+    if(data == null) {
+      console.log("\n\n[WARNING: CLIENT SENT NULL INFO]\n\n");
+      return;
+    }
+    
+    data.id = socket.id;
+
+    console.log("\nClient info recieved:");
+    console.log(data);
+    
+    // Make sure name is unique
+    var i = 0;
+    while(i < clients.length) {
+      var reset = false;
+      /*
+      while(clients[i].name == data.name) {
+        data.name += "" + (Math.random() * 10);
+        reset = true;
+      }
+      */
+      while(clients[i].color == data.color) {
+        data.color++;
+        data.color %= 8;
+        reset = true;
+      }
+      i = reset ? 0 : i + 1;
+    }
+
+    data.name = color_names[data.color];
+
+    if(clients.length == 0)
+      data.host = true;
+    else {
+      data.host = false;
+      io.to(socket.id).emit('set_host', clients[0]);
+    }
+
+    socket.emit("client_info_final", data);
+    
+    // Load up other players
+    for(var i = 0; i < clients.length; i++) { socket.emit('person_connect', clients[i]); }
+
+    clients.push(data);
+    console.log("\n[.:. " + clients.length + " USERS ONLINE .:.]");
+    io.emit("user_count", { numUsers: clients.length });
+    
+    console.log("\nClients:\n");
+    console.log(JSON.stringify(clients) + "\n");
+
+    socket.broadcast.emit('person_connect', data);
+    io.emit("force_update");
+    socket.emit("server_message", {msg: "Hello! Welcome to SUPER GAME INFINITY ONLINE!"});
+  });
+
+  socket.on("client_message", function(data) {
+    console.log("Client message: " + data.msg);
+  });
+  
+  socket.on("disconnect", function() {
+      var socketFound = false;
+      for(var i = 0; i < clients.length; i++) {
+        if(clients[i].id == socket.id) {
+          socket.broadcast.emit('person_disconnect', clients[i]);
+          console.log("\n---User disconnected---\n");
+          io.emit("user_count", { numUsers: clients.length });
+
+          clients.splice(i, 1);
+          if(i == 0 && clients.length > 0) {
+            io.to(clients[0].id).emit('become_host');
+            io.emit('set_host', clients[0]);
+          }
+          socketFound = true;
+          break;
+        }
+      }
+      if(!socketFound) {
+        console.log("\n[WARNING: DISCONNECTED SOCKET NOT FOUND]\n");
+      }
+      console.log("[.:. " + clients.length + " USERS ONLINE .:.]\n\n"); // Last output
+  });
+
+  socket.on("update", function(data) {
+    data.id = socket.id;
+    socket.broadcast.emit('update', data);
+  });
+
+  socket.on("board_data", function(data) {
+    io.to(data.dest).emit('board_data', data);
+  });
+
+  socket.on("init_board_data", function(data){
+    socket.broadcast.emit("board_data", data);
+  });
+
+  socket.on("game_reset", function() {
+    io.emit('game_reset');
+  });
+
+  socket.on("send_message", function(data) {
+    io.emit("message", data);
+  });
+});
+
+
+server.listen(port)
+server.on('error', onError);
+server.on('listening', onListening);
+
+/**
+ * Normalize a port into a number, string, or false.
+ */
+
+function normalizePort(val) {
+  var port = parseInt(val, 10);
+
+  if (isNaN(port)) {
+    // named pipe
+    return val;
+  }
+
+  if (port >= 0) {
+    // port number
+    return port;
+  }
+
+  return false;
+}
+
+/**
+ * Event listener for HTTP server "error" event.
+ */
+
+function onError(error) {
+  if (error.syscall !== 'listen') {
+    throw error;
+  }
+
+  var bind = typeof port === 'string'
+    ? 'Pipe ' + port
+    : 'Port ' + port;
+
+  // handle specific listen errors with friendly messages
+  switch (error.code) {
+    case 'EACCES':
+      console.error(bind + ' requires elevated privileges');
+      process.exit(1);
+      break;
+    case 'EADDRINUSE':
+      console.error(bind + ' is already in use');
+      process.exit(1);
+      break;
+    default:
+      throw error;
+  }
+}
+
+/**
+ * Event listener for HTTP server "listening" event.
+ */
+
+function onListening() {
+  var addr = server.address();
+  var bind = typeof addr === 'string'
+    ? 'pipe ' + addr
+    : 'port ' + addr.port;
+  debug('Listening on ' + bind);
+  console.log('Listening on ' + bind);
+}

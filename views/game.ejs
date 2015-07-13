@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>Minesweep</title>
+		<link href='http://fonts.googleapis.com/css?family=Offside|Atomic+Age|Nova+Square|Titan+One|Keania+One|Audiowide|Coda|Baumans' rel='stylesheet' type='text/css'>
+
+		<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css">
+		<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap-theme.min.css">
+		<link href="stylesheets/sweep.min.css" rel="stylesheet" type="text/css">
+
+		<script src="http://code.jquery.com/jquery-1.11.3.min.js"></script>
+		<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/js/bootstrap.min.js"></script>
+		<script type="text/javascript" src='/socket.io/socket.io.js'></script>
+		<script type="text/javascript" src="javascripts/sweep.min.js">
+		</script>
+	</head>
+
+	<body>
+		<h1 id="game-title">MINESWEEPER</h1>
+		<div id="game">
+			<div id="toolbar" class="container">
+				<div class="col-xs-4">
+					<div id="bomb-count">??</div>
+				</div>
+				<div class="col-xs-4">
+					<div id="reset-button"><span class="glyphicon glyphicon-refresh"></span></div>
+				</div>
+				<div class="col-xs-4">
+					<div id="timer">000</div>
+				</div>
+			</div>
+			<canvas id="game_screen" width="256" height="256" oncontextmenu="return false;"></canvas>
+			<div id="info">
+				<span style="margin-left: 10%">Host:</span><br />
+				<div id="host"></div>
+				<span style="margin-left: 10%">Players Online:</span><br />
+				<div id="players_online">
+				</div>
+			</div>
+			<div id="message_area">
+				<div id="message_board"></div>
+				<input type="text" id="message_input" placeholder="Send a message!"/>
+			</div>
+		</div>
+	</body>
+</html>

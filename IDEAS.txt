@@ -1,0 +1,6 @@
+- Clustering coefficient
+- Easier-harder levels
+- Scrolling around
+- Multiple clears per player (requires changing generation)
+- Multiple rooms
+	- Configurable
