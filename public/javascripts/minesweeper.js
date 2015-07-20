@@ -2,6 +2,7 @@
 var COVERED		= 'covered';
 var UNCOVERED 	= 'uncovered';
 var FLAGGED 	= 'flagged';
+var QUESTION 	= 'question';
 var colors      = [ '#B63030', '#FF7F44', '#FFFF44', '#44FF44', '#2222FF', '#44FFFF', '#FC87FF', '#6C3002' ];
 var sheet = loadImage("../images/art.png"); // Image
 var tileSize = 16;  // Size of each tile in pixels
@@ -19,7 +20,8 @@ var messageInput;
 
 /* INPUT VARIABLES */
 var mouse = {x : -1, y : -1};
-var downTile = {x: -1, y: -1}
+var downTile = {x: -1, y: -1};
+var dragStart = {x: -1, y: -1};
 var mouseLeft = false;
 var mouseRight = false;
 var dragging = false;
@@ -32,6 +34,9 @@ var ctx;
 var canvasPercent = 0.75; // Percent of window size
 var canvasMinSize = 256;
 var canvasMaxSize = 1028;
+
+var viewOffsX = 0;
+var viewOffsY = 0;
 /* */
 
 /* GAME VARIABLES */
@@ -169,8 +174,9 @@ function updateCanvas() {
 
 function getZoom() {
 	//var scale = Math.max(Math.floor(canvas.width / (numTiles * tileSize)), 1); // Floored scaling, possibly no artifacts
-	var scale = canvas.width / (numTiles * tileSize); // Basic scaling, floating point, creates artifacts
-	return scale;
+	var scale = Math.max(Math.ceil(canvas.width / (numTiles * tileSize)), 1); // Basic scaling, floating point, creates artifacts
+	//console.log(scale);
+	return 1.25;
 }
 /*
 */
@@ -272,19 +278,32 @@ function leftClickTile(coord, mouseDown) {
 		} else {
 			_tile.down = true;
 		}
+	} else if(_tile.state == FLAGGED) {
+		if(mouseDown) {
+			_tile.state = QUESTION;
+			unflagged++;
+		}
+	} else if(_tile.state == QUESTION) {
+		if(mouseDown) {
+			_tile.down = true;
+		} else if(_tile.down) {
+			_tile.down = false;
+			_tile.state = COVERED;
+			uncoverTile(coord.x, coord.y);
+		}
 	}
 }
 
 function rightClickTile(coord, mouseDown) {
 	mouseDown = mouseDown == true;
-	if(game_state.game_over || !tileValid(coord))
+	if(game_state.game_over || !tileValid(coord) || !boardGenerated)
 		return;
 
 	var _index = coord.x + coord.y * numTiles;
 	var _tile = board[_index];
 
 	// TODO: Add question mark tiles
-	if(_tile.state != UNCOVERED && boardGenerated) {
+	if(_tile.state == COVERED || _tile.state == FLAGGED || _tile.state == QUESTION) {
 		if(mouseDown) {
 			_tile.state = _tile.state == FLAGGED ? COVERED : FLAGGED;
 			unflagged += _tile.state == FLAGGED ? -1 : 1;
@@ -379,9 +398,17 @@ function toTileCoords(x, y) {
 	var boardSize = numTiles * tileSize * scale;
 	var centerOffsX = (canvas.width / 2 - boardSize / 2);
 	var centerOffsY = (canvas.height / 2 - boardSize / 2);
+	
+	var tileOffsX = centerOffsX + viewOffsX;
+	tileOffsX = tileOffsX > 0 ? 0 : tileOffsX;
+	tileOffsX = centerOffsX > 0 ? centerOffsX : tileOffsX;
+	var tileOffsY = centerOffsY + viewOffsY;
+	tileOffsY = tileOffsY > 0 ? 0 : tileOffsY;
+	tileOffsY = centerOffsY > 0 ? centerOffsY : tileOffsY;
+
 	return {
-		x: Math.floor(((x - centerOffsX) / scale ) / tileSize),
-		y: Math.floor(((y - centerOffsY) / scale) / tileSize)
+		x: Math.floor(((x - tileOffsX) / scale ) / tileSize),
+		y: Math.floor(((y - tileOffsY) / scale) / tileSize)
 	};
 }
 
@@ -493,8 +520,14 @@ function update() {
 			releaseTile(downTile.x, downTile.y);
 			sendTileRelease(downTile.x, downTile.y);
 			downTile = { x: -1, y: -1};
+			startDrag = { x: mouse.x, y: mouse.y };
 			dragging = true;
 		}
+	}
+
+	if(dragging) {
+		viewOffsX = mouse.x - startDrag.x;
+		viewOffsY = mouse.y - startDrag.y;
 	}
 
 	//console.log(dragging);
@@ -527,16 +560,24 @@ function render() {
 	ctx.msImageSmoothingEnabled = false;
 	ctx.setTransform(scale, 0, 0, scale, 0, 0);
 	
-	var boardSize = numTiles * tileSize * scale;
-	var centerOffsX = (canvas.width / 2 - boardSize / 2) / scale;
-	var centerOffsY = (canvas.height / 2 - boardSize / 2) / scale;
+	var boardSize = Math.floor(numTiles * tileSize * scale);
+	var centerOffsX = Math.floor((canvas.width / 2 - boardSize / 2) / scale);
+	var centerOffsY = Math.floor((canvas.height / 2 - boardSize / 2) / scale);
+
+	var tileOffsX = centerOffsX + viewOffsX;
+	tileOffsX = tileOffsX > 0 ? 0 : tileOffsX;
+	tileOffsX = centerOffsX > 0 ? centerOffsX : tileOffsX;
+
+	var tileOffsY = centerOffsY + viewOffsY;
+	tileOffsY = tileOffsY > 0 ? 0 : tileOffsY;
+	tileOffsY = centerOffsY > 0 ? centerOffsY : tileOffsY;
 
 	var _mouse = toTileCoords(mouse.x, mouse.y);
 
 	for(var i = 0; i < numTiles; i++) {
 		for(var j = 0; j < numTiles; j++) {
-			var _i = i * tileSize + centerOffsX;
-			var _j = j * tileSize + centerOffsY;
+			var _i = i * tileSize + tileOffsX;
+			var _j = j * tileSize + tileOffsY;
 			var index = i + j * numTiles;
 			var tile = board[index];
 			
@@ -550,9 +591,9 @@ function render() {
 				case UNCOVERED:
 					if(board[index].isBomb) {
 						if((hitBomb.x == i && hitBomb.y == j) || game_state.details == "times_up")
-							ctx.drawImage(sheet, tileSize * 1, tileSize * 3, tileSize, tileSize, _i, _j, tileSize, tileSize);
+							ctx.drawImage(sheet, tileSize * 3, tileSize * 3, tileSize, tileSize, _i, _j, tileSize, tileSize);
 						else if(game_state.game_over && tile.correct)
-							ctx.drawImage(sheet, tileSize * 2, tileSize * 3, tileSize, tileSize, _i, _j, tileSize, tileSize);
+							ctx.drawImage(sheet, tileSize * 4, tileSize * 3, tileSize, tileSize, _i, _j, tileSize, tileSize);
 						else
 							ctx.drawImage(sheet, tileSize * 0, tileSize * 3, tileSize, tileSize, _i, _j, tileSize, tileSize);
 					} else {
@@ -569,6 +610,14 @@ function render() {
 						ctx.drawImage(sheet, tileSize * 5, tileSize * 0, tileSize, tileSize, _i, _j, tileSize, tileSize);
 					else
 						ctx.drawImage(sheet, tileSize * 4, tileSize * 0, tileSize, tileSize, _i, _j, tileSize, tileSize);
+				break;
+				case QUESTION:
+					if(game_state.game_over && !tile.correct)
+						ctx.drawImage(sheet, tileSize * 7, tileSize * 0, tileSize, tileSize, _i, _j, tileSize, tileSize);
+					else if(tile.down)
+						ctx.drawImage(sheet, tileSize * 1, tileSize * 0, tileSize, tileSize, _i, _j, tileSize, tileSize);
+					else
+						ctx.drawImage(sheet, tileSize * 6, tileSize * 0, tileSize, tileSize, _i, _j, tileSize, tileSize);					
 				break;
 			}
 			

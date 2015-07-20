@@ -13,7 +13,7 @@ var server = require('http').createServer(app);
  */
 // old ports: 9012
 // 8239 = global
-var port = normalizePort(process.env.PORT || '8239');
+var port = normalizePort(process.env.PORT || '8000');
 app.set('port', port);
 
 var io = require('socket.io')().attach(server); 
